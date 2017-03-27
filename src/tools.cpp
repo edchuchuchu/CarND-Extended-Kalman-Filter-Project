@@ -58,8 +58,8 @@ MatrixXd Tools::CalculateJacobian(const VectorXd& x_state) {
 	float vy = x_state(3);
 
 	Hj << 0, 0, 0, 0,
-				0, 0, 0, 0,
-				0, 0, 0, 0;	      
+		0, 0, 0, 0,
+		0, 0, 0, 0;	      
 	//check division by zero
 	if ((px == 0)&&(py == 0)){
 	    cout << "CalculateJacobian() - Error - Division by zero" << endl;

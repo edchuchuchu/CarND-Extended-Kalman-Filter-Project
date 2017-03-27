@@ -21,6 +21,8 @@ FusionEKF::FusionEKF() {
 	R_radar_ = MatrixXd(3, 3);
 	H_laser_ = MatrixXd(2, 4);
 	Hj_ = MatrixXd(3, 4);
+	ekf_.P_ = MatrixXd(4, 4);
+	ekf_.F_ = MatrixXd(4, 4);
 
 	//measurement covariance matrix - laser
 	R_laser_ << 0.0225, 0,
@@ -38,23 +40,24 @@ FusionEKF::FusionEKF() {
 	*/
 
 	//state covariance matrix P
-	ekf_.P_ = MatrixXd(4, 4);
 	ekf_.P_ << 1, 0, 0, 0,
-						 0, 1, 0, 0,
-						 0, 0, 1000, 0,
-						 0, 0, 0, 1000;
+			 0, 1, 0, 0,
+			 0, 0, 1000, 0,
+			 0, 0, 0, 1000;
 
 	//measurement matrix
-	ekf_.H_ = MatrixXd(2, 4);
-	ekf_.H_ << 1, 0, 0, 0,
-						 0, 1, 0, 0;
+	H_laser_ << 1, 0, 0, 0,
+			 	0, 1, 0, 0;
+
+	Hj_ << 0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0;	  			 
 
 	//the initial transition matrix F_
-	ekf_.F_ = MatrixXd(4, 4);
 	ekf_.F_ << 1, 0, 1, 0,
-						 0, 1, 0, 1,
-						 0, 0, 1, 0,
-						 0, 0, 0, 1;
+			 0, 1, 0, 1,
+			 0, 0, 1, 0,
+			 0, 0, 0, 1;
 				
 }
 
@@ -85,12 +88,9 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       /**
       Convert radar from polar to cartesian coordinates and initialize state.
       */
-			float px = measurement_pack.raw_measurements_[0] * cos(measurement_pack.raw_measurements_[1]);
-			float py = measurement_pack.raw_measurements_[0] * sin(measurement_pack.raw_measurements_[1]);
-			ekf_.x_ (0) = px;
-			ekf_.x_ (1) = py;
-			ekf_.x_ (2) = 0;
-			ekf_.x_ (3) = 0;
+		float px = measurement_pack.raw_measurements_[0] * cos(measurement_pack.raw_measurements_[1]);
+		float py = measurement_pack.raw_measurements_[0] * sin(measurement_pack.raw_measurements_[1]);
+		ekf_.x_ << px, py, 0, 0;
     }
     else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
       /**
@@ -121,16 +121,16 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 	
 	//1. Modify the F matrix so that the time is integrated
 	ekf_.F_ << 1, 0, dt, 0,
-						 0, 1, 0, dt,
-						 0, 0, 1, 0,
-						 0, 0, 0, 1;	
+			 0, 1, 0, dt,
+			 0, 0, 1, 0,
+			 0, 0, 0, 1;	
 	//2. Set the process covariance matrix Q
 	MatrixXd G = MatrixXd(4, 2);
 	MatrixXd Qv = MatrixXd(2, 2);
 	G  << pow(dt, 2)/2, 0,
-				0, pow(dt, 2)/2,
-				dt, 0,
-				0, dt;
+		0, pow(dt, 2)/2,
+		dt, 0,
+		0, dt;
 	//set the acceleration noise components
 	float noise_ax = 9;
 	float noise_ay = 9;			
@@ -151,13 +151,15 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 
   if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
     // Radar updates
-		ekf_.H_ = tools.CalculateJacobian(ekf_.x_);
-		ekf_.R_ = R_radar_;
-		ekf_.UpdateEKF(measurement_pack.raw_measurements_);
+    Hj_ = tools.CalculateJacobian(ekf_.x_);
+	ekf_.H_ = Hj_;
+	ekf_.R_ = R_radar_;
+	ekf_.UpdateEKF(measurement_pack.raw_measurements_);
   } else {
     // Laser updates
-		ekf_.R_ = R_laser_;
-		ekf_.Update(measurement_pack.raw_measurements_);
+    ekf_.H_ = H_laser_;
+	ekf_.R_ = R_laser_;
+	ekf_.Update(measurement_pack.raw_measurements_);
   }
 
   // print the output
